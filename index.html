@@ -103,14 +103,14 @@
         </figcaption>
     </figure>
 
-    <i>We recreated the mysterious Macro Data Refinement game from Severance on a Raspberry Pi
+    <i>We recreated the mysterious MacroData Refinement game from Severance on a Raspberry Pi
         Pico, complete with
         VGA display and joystick controls</i>
     <h2>Introduction</h2>
 
 
 
-    This project implements an interactive game simulating the Macro Data Refinement (MDR) process from the Apple
+    This project implements an interactive game simulating the MacroData Refinement (MDR) process from the Apple
     TV+ show
     Severance, rendered on a VGA display and controlled via a joystick and button interfaced with a Raspberry Pi
     Pico
@@ -201,6 +201,12 @@
         material from Severance. The game mechanics, while inspired by the show, are our own faithful interpretation and
         implementation.</p>
     <h2>Program/Hardware design</h2>
+    <figure style="text-align: center; margin: 20px 0;">
+        <img src="images/physical_hardware.png" alt="Physical Hardware" width="500" height="300">
+        <figcaption style="font-style: italic; font-size: 14px; margin-top: 5px;">
+            Figure 2: Physical Hardware.
+        </figcaption>
+    </figure>
     <h3>Joystick</h3>
     <p>For the hardware of the joystick, we connected it to the program using the Analog to Digital Converter (ADC)
         feature
@@ -215,7 +221,7 @@
     <figure style="text-align: center; margin: 20px 0;">
         <img src="images/joystick.png" alt="Picture of Joystick used" width="500">
         <figcaption style="font-style: italic; font-size: 14px; margin-top: 5px;">
-            Figure 2: Image of Joystick used in project and it's respective wiring
+            Figure 3: Image of Joystick used in project and its respective wiring
         </figcaption>
     </figure>
     <p>
@@ -280,7 +286,7 @@
     <figure style="text-align: center; margin: 20px 0;">
         <img src="images/debouncing.png" alt="Debouncing state machine" width="500">
         <figcaption style="font-style: italic; font-size: 14px; margin-top: 5px;">
-            Figure 3: Debouncing State Machine.
+            Figure 4: Debouncing State Machine
         </figcaption>
     </figure>
     <h3>VGA Display</h3>
@@ -332,6 +338,13 @@
         game (e.g., START_SCREEN, PLAYING). <code>total_bad_numbers</code> tracks the count of unrefined "bad numbers" -
         when there are zero left, the game is won! Finally, <code>progress_bar</code> is a ProgressBarAnimation struct
         for managing the top progress bar's visual state.</p>
+
+    <figure style="text-align: center; margin: 20px 0;">
+        <img src="images/game_logic.png" alt="Game State" width="500" height="500">
+        <figcaption style="font-style: italic; font-size: 14px; margin-top: 5px;">
+            Figure 5: Main animation loop logic
+        </figcaption>
+    </figure>
 
     <p>Initialization is handled by <code>game_state_init()</code>, which populates the number grid with random values,
         assigns some
@@ -516,7 +529,7 @@
         process
         depicted in the TV show Severance. As such, all intellectual property rights related to the original concept and
         design elements remain with the creators and rights holders of Severance. All patented or trademark issues are
-        non-existent as long as we don’t present this project as an original creation or try to monetize this game in
+        non-existent as long as we don't present this project as an original creation or try to monetize this game in
         any
         manner. Therefore, a patent opportunity is not an option.
     </p>
@@ -562,7 +575,7 @@
         <li><a href="code/game_state.c">game_state.c</a></li>
         <li><a href="code/main.c">main.c</a></li>
         <li><a href="code/draw_oval.c">draw_oval_patch.c</a></li>
-    </ul> 
+    </ul>
     <h2>References</h2>
     <ul>
         <li>Used Joystick Datasheet as a model for ADC code:
