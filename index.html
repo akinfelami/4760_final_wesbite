@@ -4,7 +4,8 @@
     <title>MacroData Refinement - Severance-Inspired Number Sorting Game</title>
     <meta name="description"
         content="A Severance-inspired MacroData Refinement implementation where numbers are sorted based on emotions (Woe, Frolic, Dread, and Malice) they evoke. Built on Raspberry Pi Pico.">
-    <meta name="keywords" content="Severance, MacroData Refinement, Lumon Industries, Raspberry Pi Pico, number sorting, emotions, Woe, Frolic, Dread, Malice">
+    <meta name="keywords"
+        content="Severance, MacroData Refinement, Lumon Industries, Raspberry Pi Pico, number sorting, emotions, Woe, Frolic, Dread, Malice">
     <meta name="author" content="Akinfolami Akin-Alamu, Wilson Coronel">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta content="text/html; charset=UTF-8" http-equiv="content-type">
@@ -186,6 +187,82 @@
         material from Severance. The game mechanics, while inspired by the show, are our own faithful interpretation and
         implementation.</p>
     <h2>Program/Hardware design</h2>
+    <h3>Hardware Design</h3>
+    <p>For the hardware of the joystick, we connected it to the program using the Analog to Digital Converter (ADC)
+        feature
+        on the Raspberry Pi. This was implemented in a single protothread called Protothread_joystick. We reserved GPIO
+        pins
+        27 and 28 to function as the Voltage-Read-X-coordinate (VRX) and Voltage-Read-Y-coordinate (VRY), respectively.
+        To
+        implement the joystick correctly, we must first understand how this specific joystick works.
+    </p>
+    <p>
+        Moving the joystick left or right changes the voltage of the VRX whereas up and down changes the voltage of VRY.
+        This movement relays the analog voltage level to the RP2040 to which it then converts to a binary signal. In
+        order
+        to provide voltage in the first place, we connect the joystick to GPIO pin 36, which functions as an output of
+        3.3
+        Volts.
+    </p>
+    <p>
+        When turned left, the voltage level is 0 (shorted to ground), corresponding to a binary value of 0. Similarly,
+        when
+        turned right, the voltage level is 3.3 volts and that corresponds to a binary value of 8023. Generally in
+        joystick
+        architecture that is found in any controller, there is a threshold for which when the ADC value crosses, it
+        counts
+        as a read for turning left or right, For example, our int value X_RIGHT_THRESHOLD is set to 3000, for when the
+        returned ADC value is greater than this number the program knows to count that as a right. This is also done for
+        left, up and down.
+    </p>
+    <p>
+        Our first attempt to implement the joystick came with a small obstacle. We generally use the ADC to poll
+        something
+        such as a potentiometer, which provides a single voltage output into the RP2040. However, we are now trying to
+        read
+        two values, that being VRX and VRY. At first, we implemented an in-built feature of the ADC known as
+        adc_set_round_robin. Which uses a queue in order to have a First-in-First-out data structure. The ADC reads one
+        input, puts it in the queue, and then polls the next input into the queue. However, we noticed that it randomly
+        picked an input to start the queue, which made it difficult to program other functions that rely on knowing if
+        VRX
+        or VRY is going to pop from the queue. Also, with the round robin method it provided a lot of memory overhead,
+        something we were trying to avoid.
+    </p>
+    <p>
+        This then led to us having helper functions that when called, switched the input to be read to either VRX or
+        VRY.
+        While this does increase our running time a bit, it was the best option as we favored memory over speed.
+    </p>
+    <p>
+        The ADC feature polls the voltage level of the joystick far too frequently for any realistic human interaction.
+        In
+        order to circumvent this, we added a timer that polls the protothread every 70 ms. We got to this number by user
+        testing random numbers and saw which timer gave us the most smooth interaction.
+    </p>
+    <p>
+        Included in the joystick is a button that can be pressed. This means we need debouncing and implies that there
+        should be a separate protothread. This is done because debouncing relies on quick execution of a state machine
+        that
+        tells us if it reads a button press because a person is pressing the button or contact between mechanical
+        switches
+        that can happen arbitrarily. We need to read this at a higher frequency than that of the joystick. So we
+        schedule
+        the protothread for the button to run every 30 ms as opposed to the 70 ms the joystick protothread runs on.
+    </p>
+    <p>
+        To support the VGA display, specific GPIO pins on the RP2040 are connected to the VGA port: GPIO 16 is used for
+        horizontal sync (Hsync), and GPIO 17 for vertical sync (Vsync). Color signals are sent through GPIO 18 and 19
+        for
+        green (via 470 Ω and 330 Ω resistors, respectively), GPIO 20 for blue (330 Ω), and GPIO 21 for red (330 Ω). The
+        ground of the RP2040 is connected to VGA ground. The DMA channel, paced by the DREQ_PIO0_TX2 data request
+        signal,
+        feeds pixel data to the RGB PIO state machine. Each byte sent corresponds to a character in the global
+        vga_data_array, representing two adjacent pixels. We use 4 bits per pixel: 1 bit each for red and blue, and 2
+        bits
+        for green, taking advantage of the eye’s greater sensitivity to green. As mentioned before, we used the vga
+        library
+        provided by Hunter Adams.
+    </p>
     <!-- <p>The Program to Hardware connections are as follows: </p>
     <ul>
         <li>the Host (Computer I/O) waits for a keypad input from the
@@ -358,48 +435,84 @@
         the next frame, the reverse of the process for growing the box happens.
     </p>
     <h2>Results of the design</h2>
-    <p>We were successful in having
-        ChatGPT produce an interesting melody in the key that we pressed and we verified through using the
-        oscilloscope and an iPhone app that the frequencies that were being output corresponded to the correct
-        notes. Overall, the first note that was produced in the melodies was the key that we pressed, which we
-        wanted. The rest of the notes would be in the key of the note that we pressed and the number of notes in the
-        melody would always correspond to the number of notes we specified in the prompt to ChatGPT. The melodies
-        themselves would have arpeggios and some scales (consecutive notes up or down the measure) and sounded
-        pleasant.</p>
-    <p>The speed of the execution is
-        almost entirely dependent upon how quickly ChatGPT would be able to generate the melody based on our prompt.
-        Thus, we focused on making our prompt as reliable and concise as possible so that ChatGPT would spend just a
-        few seconds to produce the melody. Otherwise, there is very low latency between the time when the user
-        presses the keypad to when sound is output through the speakers. After switching to PWM, we no longer faced
-        any concurrency issues that hindered us greatly in our DDS implementation. </p>
-    <p>Our project has no safety concerns that we can think of. The project is
-        highly usable for anyone since all that is required to generate melodies</p>
-    <h2>Conclusions</h2>
-    <p>Overall, we were proud of our
-        final project and ultimately succeeded in having ChatGPT generate different melodies each time a new key is
-        pressed. Our expectations since the start of the project were met, although there are many improvements that
-        can be made. I think our structure of having a python file in charge of using the ChatGPT API and a C file
-        that handles the Pico controls, and communicating over UART and Serial works well with low latency. We were
-        initially worried that the prompting of ChatGPT would be too volatile and would not output the correct array
-        of frequencies and durations (or even an array at all), but after thorough prompt engineering, the output
-        from ChatGPT works almost 100% of the time. Our testing methodology of using the python script to print out
-        what is going on at every stage of the pipeline, whether that&rsquo;s in the protothreads or in the python
-        function, was crucial in our debugging.</p>
-    <p>Given more time, w</span><span>e wanted to completely finish adding a record mode by
-            pressing 0 on the keypad, where many keys can be pressed (until the 0 key is pressed again), so that we can
-            have an initial melody of a few notes that chatgpt can then take to create an even more elaborate melody,
-            instead of creating a melody solely based on one key press.</span><span class=" ">&nbsp;We can then
-            save whatever melody was generated in some database file so that if the user wanted to play it back in the
-            future, they could do so easily. If such data was stored, there could be much more elaborate
-            songs/compositions that can be constructed by GPT, just by simply prompting it with multiple melodies that
-            it had prompted earlier. We wanted to push the limits to see if it can generate different harmonies (chords
-            perhaps) instead of just a singular melody</span></p>
-    <p>We adapted our C code from lab 1 due to its similarity with what we were trying to achieve,
-        although our code differs due to additional protothreads, using PWM instead of an ISR for DDS, not using a
-        VGA display, and overall logic. We did not use any of Altera&rsquo;s IP, did not code in the public domain,
-        did not need to deal with patent/trademark issues, and did not have to sign a non-disclosure agreement to
-        get a sample part. There are certainly a myriad of future possibilities that combine LLMs with embedded
-        devices that may lead to patent opportunities.</span></p>
+    <h3>Results</h3>
+    <p>The primary goal of this project was to replicate the sorting process featured in the TV show Severance, with a
+        strong emphasis on usability. Our objective was to make the game fully playable and closely aligned with its
+        on-screen counterpart, ensuring that fans of the show could engage with it and feel as though they were
+        experiencing
+        the original game firsthand.
+        We ended up with a result that satisfies the above. With the in game mechanics and scoring system based off the
+        game, we were able to replicate it to a close degree of accuracy. We emphasized minor details such as the Lumon
+        Logo
+        on the upper right hand corner, and the visuals that happen when a point is won.
+        Due to multiple things happening at the same time, there are occasional flickers in the game. This is mostly due
+        to
+        having to constantly update the boids, redraw the screen, and poll the ADC values at a very high frequency so
+        that
+        it appears everything is happening concurrently. However, this flickering was improved when work was divided
+        between
+        the two cores.
+    </p>
+
+    <p>The primary goal of this project was to replicate the sorting process featured in the TV show Severance, with a
+        strong emphasis on usability. Our objective was to make the game fully playable and closely aligned with its
+        on-screen counterpart, ensuring that fans of the show could engage with it and feel as though they were
+        experiencing
+        the original game firsthand.
+    </p>
+    <p>
+        We ended up with a result that satisfies the above. With the in game mechanics and scoring system based off the
+        game, we were able to replicate it to a close degree of accuracy. We emphasized minor details such as the Lumon
+        Logo
+        on the upper right hand corner, and the visuals that happen when a point is won.
+    </p>
+    <p>
+        Due to multiple things happening at the same time, there are occasional flickers in the game. This is mostly due
+        to
+        having to constantly update the boids, redraw the screen, and poll the ADC values at a very high frequency so
+        that
+        it appears everything is happening concurrently. However, this flickering was improved when work was divided
+        between
+        the two cores.
+    </p>
+    <h3>Conclusion</h3>
+    <p>
+        The design of this project aligned very well with our expectations. We expected to model the game from the show
+        Severance and the result turned out to be very similar to the game in the show.
+    </p>
+    <p>
+        What could have been done in another approach, in order to improve accuracy, was display things such as the logo
+        using a bitmap. This could be achieved by downloading the Lumon logo online and turning it into a bitmap image,
+        loading it onto the RP2040’s memory, and displaying it on the VGA. This would have better mirrored what is on
+        the
+        show.
+    </p>
+    <p>
+        Another thing we could have implemented was music. Although there were attempts, the background music could not
+        have
+        been found online to download. Additionally, the background music lasted too long such that once this audio was
+        converted to an array of unsigned 16 bit integers, there would have been too much memory overhead that other
+        parts
+        of the program would suffer.
+    </p>
+    <p>
+        While we did not reuse any code or directly copy protected material, our design was inspired by the sorting
+        process
+        depicted in the TV show Severance. As such, all intellectual property rights related to the original concept and
+        design elements remain with the creators and rights holders of Severance. All patented or trademark issues are
+        non-existent as long as we don’t present this project as an original creation or try to monetize this game in
+        any
+        manner. Therefore, a patent opportunity is not an option.
+    </p>
+    <p>
+        In conclusion, this project provided a chance to use what we learned throughout the semester such that we were
+        able
+        to replicate a game from a popular TV show using a Raspberry Pi 2040. This project emphasizes the versatility
+        and
+        potential of a microcontroller. To create a game that we see on television while only using a microcontroller
+        shows
+        how the use of a microcontroller is dependent on one’s imagination.
+    </p>
     <h2>Appendix A</h2>
     <ul>
         <li>&quot;The group approves this report for inclusion on the
@@ -407,25 +520,13 @@
         <li>&quot;The group approves the video for inclusion on the course
             youtube channel.&quot;</li>
     </ul>
-    <h2>Additional Appendices</h2>
-    <h3>Primary Task Distribution</h3>
-    <p>Both members contributed to all aspects of the project, these were the focuses
-        of each team member:</p>
-    <ul>
-        <li>Edward: Ideation of project, ChatGPT python script, C script,
-            debugging</li>
-        <li>Filipe: Building the hardware setup, C script, debugging</li>
-        </li>
-    </ul>
     <h2>References</h2>
     <ul>
-        <li>We used the ChatGPT API documentation to help us reliably
-            communicate with ChatGPT through the terminal.</li>
-        <li>We used the RP2040 datasheets and Lab1 as references.</li>
+        <li>Used Joystick Datasheet as a model for ADC code:
+            <a
+                href="https://newbiely.com/tutorials/raspberry-pico/raspberry-pi-pico-joystick">Joystick Datasheet</a>
         </li>
-        <li>Our PWM implementation is adapted from a fellow student,
-            Pelham, who was also having trouble with DDS and was successful in using PWM.</li>
-        <li>All materials used are from Lab1.</li>
+        <li>We used the RP2040 datasheets as references.</li>
     </ul>
 </body>
 
